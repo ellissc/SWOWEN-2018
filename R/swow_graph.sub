@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH --mail-user=ecain@ucmerced.edu
+#SBATCH --mail-type=ALL
+#SBATCH -p medium
+#SBATCH -t 06:00:00
+#SBATCH --ntasks-per-node=56
+#SBATCH --output=log_createSWOWgraph.qlog
+#SBATCH --job-name=swowgraph
+#SBATCH --export=ALL
+
+# This submission file will run a simple set of commands. All stdout will
+# be captured in test1.qlog (as specified in the Slurm command --output above).
+# This job file uses a shared-memory parallel environment and requests 20
+# cores (--ntasks option) on a single node(--nodes option). This job will also run a global #script called
+# run. For more info on this script, cat /usr/local/bin/merced_node_print.
+#
+
+whoami
+
+module load anaconda3
+source activate r_env
+Rscript createSWOWGraph.R
+
+uptime
+hostname
+datetime

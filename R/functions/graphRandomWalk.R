@@ -62,10 +62,13 @@
 #
 # See creataeRandomWalk.m for a more efficient version
 
+library('here')
+setwd(here())
 library('Matrix')
 library('tictoc')
 library('tidyverse')
 library('igraph')
+library(stopwords)
 
 
 source('./R/functions/importDataFunctions.R')
@@ -77,29 +80,29 @@ source('./R/functions/similarityFunctions.R')
 # or choose 'R123' to include all responses
 
 # default value for alpha 
-alpha = 0.75
+#alpha = 0.75
 
 # Load the data 
-dataFile.SWOWEN     = './data/2018/processed/SWOW-EN.R100.csv'
-SWOW.R1             = importDataSWOW(dataFile.SWOWEN,'R1')
+#dataFile.SWOWEN     = './data/2018/processed/SWOW-EN.R100.csv'
+#SWOW.R1             = importDataSWOW(dataFile.SWOWEN,'R1')
 
 # Generate the weighted graphs
-G                   = list()
-G$R1$Strength       = weightMatrix(SWOW.R1,'strength')
-G$R1$PPMI           = weightMatrix(SWOW.R1,'PPMI')
+#G                   = list()
+#G$R1$Strength       = weightMatrix(SWOW.R1,'strength')
+#G$R1$PPMI           = weightMatrix(SWOW.R1,'PPMI')
 
-tic()
-G$R1$RW             = weightMatrix(SWOW.R1,'RW',alpha)
-toc()
+#tic()
+#G$R1$RW             = weightMatrix(SWOW.R1,'RW',alpha)
+#toc()
 
 
 # Compute the cosine similarity matrix
-S = cosineMatrix(G$R1$RW)
+#S = cosineMatrix(G$R1$RW)
 
-write.csv(S,'./output/2018/S_RW.R1.csv')
+#write.csv(S,'./output/2018/S_RW.R1.csv')
 
 
-rm(list = ls())
+#rm(list = ls())
 
 source('./R/functions/importDataFunctions.R')
 source('./R/functions/networkFunctions.R')
@@ -108,20 +111,131 @@ source('./R/functions/similarityFunctions.R')
 alpha = 0.75
 
 # Load the data 
-dataFile.SWOWEN     = './data/2018/processed/SWOW-EN.R100.csv'
+# File that I generated: /home/ecain/data/diachronic_lang_change/data_output/swow_eng_filtered.csv
+# dataFile.SWOWEN     = './data/2018/processed/SWOW-EN.R100.csv'
+dataFile.SWOWEN       = '/home/ecain/data/diachronic_lang_change/data_output/swow_eng_filtered.csv'
+output_dir            = '/home/ecain/data/diachronic_lang_change/data_output/swow_katz_rsm/'
 SWOW.R123             = importDataSWOW(dataFile.SWOWEN,'R123')
+histwords_vocab       = read_csv("/home/ecain/data/diachronic_lang_change/data/histwords_vocab.csv")
 
-# Generate the weighted graphs
-G                   = list()
-G$R123$Strength       = weightMatrix(SWOW.R123,'strength')
-G$R123$PPMI           = weightMatrix(SWOW.R123,'PPMI')
+# Running for 10y bins
+by_num                = 10
+age_groups            = c(seq(20,70,by=by_num), 100)
 
-tic()
-G$R123$RW             = weightMatrix(SWOW.R123,'RW',alpha)
-toc()
+age_init_1 = age_groups[1]
+age_init_2 = age_groups[2]
+
+cue_cab <- dataset |> 
+  filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
+  filter(!grepl(" ", cue) & #Select only single words cues
+           !grepl("null", cue) & #Remove null due to later issues
+           (nchar(cue)>1) & #Remove single char
+           (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
+  select(cue)
+
+cue_cab <- unique(cue_cab)
+
+for (ii in 2:(length(age_groups)-1)){
+  age_lower <- age_groups[ii]
+  age_upper <- age_groups[ii+1]
+  
+  new_cue_cab <- dataset |> 
+    filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
+    filter(!grepl(" ", cue) & #Select only single words cues
+            !grepl("null", cue) & #Remove null due to later issues
+            (nchar(cue)>1) & #Remove single char
+            (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
+    select(cue)
+  
+  cue_cab <- intersect(cue_cab, unique(cue_cab))
+}
+
+cue_cab <- intersect(cue_cab, histwords_vocab$word)
+cue_cab <- unique(cue_cab)
+
+write.csv(cue_cab, paste("/home/ecain/data/diachronic_lang_change/data_output/cue_vocab_by",by_num,".csv",sep = ""), row.names=FALSE)
+
+for (ii in 1:(length(age_groups)-1)){
+  age_lower <- age_groups[ii]
+  age_upper <- age_groups[ii+1]
+
+  subset <- SWOW.R123 %>% filter((relative_age >= age_lower) & (relative_age < age_upper) & (cue %in% cue_cab))
+  # Generate the weighted graphs
+  G                   = list()
+  G$R123$Strength       = weightMatrix(SWOW.R123,'strength')
+  G$R123$PPMI           = weightMatrix(SWOW.R123,'PPMI')
+
+  tic()
+  G$R123$RW             = weightMatrix(subset,'RW',alpha)
+  toc()
 
 
-# Compute the cosine similarity matrix
-S = cosineMatrix(G$R123$RW)
+  # Compute the cosine similarity matrix
+  S = cosineMatrix(G$R123$RW)
+ 
+  output_filename <- paste0(output_dir,'S_RW_',age_lower,'-',age_upper,'.csv')
+  write.csv(S,output_filename)
+  rm(subset, G, S)
+}
 
-write.csv(S,'./output/2018/S_RW.R123.csv')
+
+# REDO by 5 year bins
+
+by_num            = 5
+age_groups        = c(seq(20, 70, by= by_num), 100)
+
+age_init_1 = age_groups[1]
+age_init_2 = age_groups[2]
+
+cue_cab <- dataset |> 
+  filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
+  filter(!grepl(" ", cue) & #Select only single words cues
+           !grepl("null", cue) & #Remove null due to later issues
+           (nchar(cue)>1) & #Remove single char
+           (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
+  select(cue)
+
+cue_cab <- unique(cue_cab)
+
+for (ii in 2:(length(age_groups)-1)){
+  age_lower <- age_groups[ii]
+  age_upper <- age_groups[ii+1]
+  
+  new_cue_cab <- dataset |> 
+    filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
+    filter(!grepl(" ", cue) & #Select only single words cues
+            !grepl("null", cue) & #Remove null due to later issues
+            (nchar(cue)>1) & #Remove single char
+            (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
+    select(cue)
+  
+  cue_cab <- intersect(cue_cab, unique(cue_cab))
+}
+
+cue_cab <- intersect(cue_cab, histwords_vocab$word)
+cue_cab <- unique(cue_cab)
+
+write.csv(cue_cab, paste("/home/ecain/data/diachronic_lang_change/data_output/cue_vocab_by",by_num,".csv",sep = ""), row.names=FALSE)
+
+for (ii in 1:(length(age_groups)-1)){
+  age_lower <- age_groups[ii]
+  age_upper <- age_groups[ii+1]
+
+  subset <- SWOW.R123 %>% filter((relative_age >= age_lower) & (relative_age < age_upper) & (cue %in% cue_cab))
+
+  G                   = list()
+  G$R123$Strength       = weightMatrix(SWOW.R123,'strength')
+  G$R123$PPMI           = weightMatrix(SWOW.R123,'PPMI')
+
+  tic()
+  G$R123$RW             = weightMatrix(subset,'RW',alpha)
+  toc()
+
+
+  # Compute the cosine similarity matrix
+  S = cosineMatrix(G$R123$RW)
+ 
+  output_filename <- paste0(output_dir,'S_RW_',age_lower,'-',age_upper,'.csv')
+  write.csv(S,output_filename)
+  rm(subset, G, S)
+}

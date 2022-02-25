@@ -13,7 +13,9 @@
 # Author: Simon De Deyne simon2d@gmail.com
 # Last changed: 13 June 2019
 
-
+library(here)
+setwd(here())
+library(tidyverse)
 library('igraph')
 library('Matrix')
 
