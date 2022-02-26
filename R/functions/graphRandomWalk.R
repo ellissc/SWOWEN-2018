@@ -117,6 +117,7 @@ dataFile.SWOWEN       = '/home/ecain/data/diachronic_lang_change/data_output/swo
 output_dir            = '/home/ecain/data/diachronic_lang_change/data_output/swow_katz_rsm/'
 SWOW.R123             = importDataSWOW(dataFile.SWOWEN,'R123')
 histwords_vocab       = read_csv("/home/ecain/data/diachronic_lang_change/data/histwords_vocab.csv")
+`%nin%`               = Negate(`%in%`)
 
 # Running for 10y bins
 by_num                = 10
@@ -125,7 +126,7 @@ age_groups            = c(seq(20,70,by=by_num), 100)
 age_init_1 = age_groups[1]
 age_init_2 = age_groups[2]
 
-cue_cab <- dataset |> 
+filtered_data <- SWOW.R123 |> 
   filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
   filter(!grepl(" ", cue) & #Select only single words cues
            !grepl("null", cue) & #Remove null due to later issues
@@ -133,33 +134,42 @@ cue_cab <- dataset |>
            (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
   select(cue)
 
-cue_cab <- unique(cue_cab)
+filtered_data |>
+  head()
+
+# Finished vocab generation
+
+vocab_intersection <- unique(filtered_data$cue)
+print("Finish initial generation")
 
 for (ii in 2:(length(age_groups)-1)){
   age_lower <- age_groups[ii]
   age_upper <- age_groups[ii+1]
   
-  new_cue_cab <- dataset |> 
-    filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
+  temp <- SWOW.R123 |> 
+    filter((relative_age >= age_lower) & (relative_age < age_upper)) |>  #Seed age group, filter dataset to age group
     filter(!grepl(" ", cue) & #Select only single words cues
             !grepl("null", cue) & #Remove null due to later issues
             (nchar(cue)>1) & #Remove single char
             (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
     select(cue)
   
-  cue_cab <- intersect(cue_cab, unique(cue_cab))
+  print("Finished age group")
+  vocab_intersection <- intersect(vocab_intersection, unique(temp$cue))
 }
 
-cue_cab <- intersect(cue_cab, histwords_vocab$word)
-cue_cab <- unique(cue_cab)
+print("Checking histwords")
+vocab_intersection <- intersect(vocab_intersection, histwords_vocab$word)
+vocab_intersection <- unique(vocab_intersection)
+head(vocab_intersection)
 
-write.csv(cue_cab, paste("/home/ecain/data/diachronic_lang_change/data_output/cue_vocab_by",by_num,".csv",sep = ""), row.names=FALSE)
+write.csv(vocab_intersection, paste("/home/ecain/data/diachronic_lang_change/data_output/cue_vocab_by",by_num,".csv",sep = ""), row.names=FALSE)
 
 for (ii in 1:(length(age_groups)-1)){
   age_lower <- age_groups[ii]
   age_upper <- age_groups[ii+1]
 
-  subset <- SWOW.R123 %>% filter((relative_age >= age_lower) & (relative_age < age_upper) & (cue %in% cue_cab))
+  subset <- SWOW.R123 %>% filter((relative_age >= age_lower) & (relative_age < age_upper) & (cue %in% vocab_intersection))
   # Generate the weighted graphs
   G                   = list()
   G$R123$Strength       = weightMatrix(SWOW.R123,'strength')
@@ -187,7 +197,7 @@ age_groups        = c(seq(20, 70, by= by_num), 100)
 age_init_1 = age_groups[1]
 age_init_2 = age_groups[2]
 
-cue_cab <- dataset |> 
+filtered_data <- SWOW.R123 |> 
   filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
   filter(!grepl(" ", cue) & #Select only single words cues
            !grepl("null", cue) & #Remove null due to later issues
@@ -195,33 +205,40 @@ cue_cab <- dataset |>
            (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
   select(cue)
 
-cue_cab <- unique(cue_cab)
+filtered_data |>
+  head()
+
+vocab_intersection <- unique(filtered_data$cue)
+print("Finish initial generation")
 
 for (ii in 2:(length(age_groups)-1)){
   age_lower <- age_groups[ii]
   age_upper <- age_groups[ii+1]
   
-  new_cue_cab <- dataset |> 
-    filter((relative_age >= age_init_1) & (relative_age < age_init_2)) |>  #Seed age group, filter dataset to age group
+  temp <- SWOW.R123 |> 
+    filter((relative_age >= age_lower) & (relative_age < age_upper)) |>  #Seed age group, filter dataset to age group
     filter(!grepl(" ", cue) & #Select only single words cues
             !grepl("null", cue) & #Remove null due to later issues
             (nchar(cue)>1) & #Remove single char
             (response %nin% stopwords("en", source = "nltk"))) |>  #Remove stopwords
     select(cue)
   
-  cue_cab <- intersect(cue_cab, unique(cue_cab))
+  print("Finished age group")
+  vocab_intersection <- intersect(vocab_intersection, unique(temp$cue))
 }
 
-cue_cab <- intersect(cue_cab, histwords_vocab$word)
-cue_cab <- unique(cue_cab)
+print("Checking histwords")
+vocab_intersection <- intersect(vocab_intersection, histwords_vocab$word)
+vocab_intersection <- unique(vocab_intersection)
+head(vocab_intersection)
 
-write.csv(cue_cab, paste("/home/ecain/data/diachronic_lang_change/data_output/cue_vocab_by",by_num,".csv",sep = ""), row.names=FALSE)
+write.csv(vocab_intersection, paste("/home/ecain/data/diachronic_lang_change/data_output/cue_vocab_by",by_num,".csv",sep = ""), row.names=FALSE)
 
 for (ii in 1:(length(age_groups)-1)){
   age_lower <- age_groups[ii]
   age_upper <- age_groups[ii+1]
 
-  subset <- SWOW.R123 %>% filter((relative_age >= age_lower) & (relative_age < age_upper) & (cue %in% cue_cab))
+  subset <- SWOW.R123 %>% filter((relative_age >= age_lower) & (relative_age < age_upper) & (cue %in% vocab_intersection))
 
   G                   = list()
   G$R123$Strength       = weightMatrix(SWOW.R123,'strength')
